@@ -1,22 +1,20 @@
 const database = require("./database");
 
 const getUsers = (req, res) => {
-  const initialSql = "select * from users";
-  const where = [];
+  let sql = "select * from users";
+  const sqlValues = [];
 
-  if (req.query.language != null) {
-    where.push({
-      column: "language",
-      value: req.query.language,
-      operator: "=",
-    });
-  }
-  if (req.query.city != null) {
-    where.push({
-      column: "city",
-      value: req.query.city,
-      operator: "=",
-    });
+  if (req.query.language !== undefined) {
+    sql += " where language = ?";
+    sqlValues.push(req.query.language);
+
+    if (req.query.city !== undefined) {
+      sql += " and city = ?";
+      sqlValues.push(req.query.city);
+    }
+  } else if (req.query.city !== undefined) {
+    sql += " where city = ?";
+    sqlValues.push(req.query.city);
   }
 
   database
