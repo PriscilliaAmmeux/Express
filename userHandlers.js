@@ -16,16 +16,8 @@ const getUsers = (req, res) => {
     sql += " where city = ?";
     sqlValues.push(req.query.city);
   }
-
   database
-    .query(
-      where.reduce(
-        (sql, { column, operator }, index) =>
-          `${sql} ${index === 0 ? "where" : "and"} ${column} ${operator} ?`,
-        initialSql
-      ),
-      where.map(({ value }) => value)
-    )
+    .query(sql, sqlValues)
     .then(([users]) => {
       res.json(users);
     })
