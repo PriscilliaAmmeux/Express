@@ -1,38 +1,81 @@
 require("dotenv").config();
-
 const express = require("express");
 
 const app = express();
 
-app.use(express.json());
+const port = process.env.APP_PORT ?? 5000;
 
-const port = 5000;
+app.use(express.json());
 
 const welcome = (req, res) => {
   res.send("Welcome to my favourite movie list");
 };
 
+const Session = require("express-session");
+const FileStore = require("session-file-store")(Session);
+const path = require("path");
+
+app.use(
+  Session({
+    store: new FileStore({
+      path: path.join(__dirname, "/tmp"),
+      encrypt: true,
+    }),
+    secret: "it' a secret, you will not know !",
+    resave: true,
+    saveUninitialized: true,
+    name: "sessionId",
+  })
+);
+
 app.get("/", welcome);
 
 const movieHandlers = require("./movieHandlers");
+const userHandlers = require("./userHandlers");
+const validator = require("./validator");
+const {
+  hashPassword,
+  verifyPassword,
+  verifyToken,
+  verifyId,
+} = require("./auth.js");
 
 app.get("/api/movies", movieHandlers.getMovies);
 app.get("/api/movies/:id", movieHandlers.getMovieById);
-app.post("/api/movies", movieHandlers.postMovie);
-app.put("/api/movies/:id", movieHandlers.updateMovie);
+app.get("/api/users", userHandlers.getUsers);
+app.get("/api/users/:id", userHandlers.getUserById);
+app.get("/api/session-in", (req, res) => {
+  req.session.song = "fais dodo ! ";
+  res.send("Cola mon petit frère");
+});
+app.get("/api/session-out", (req, res) => {
+  res.send(req.session.song);
+});
+app.post(
+  "/api/users",
+  validator.validateUser,
+  hashPassword,
+  userHandlers.postUser
+);
+app.post(
+  "/api/login",
+  userHandlers.getUserByEmailWithPasswordAndPassToNext,
+  verifyPassword
+);
+
+app.use(verifyToken);
+app.post("/api/movies", validator.validateMovie, movieHandlers.postMovie);
+app.put("/api/movies/:id", validator.validateMovie, movieHandlers.putMovie);
 app.delete("/api/movies/:id", movieHandlers.deleteMovie);
 
-const usersHandlers = require("./userHandlers");
-
-app.get("/api/users", usersHandlers.getUsers);
-app.get("/api/users/:id", usersHandlers.getUserById);
-// app.post("/api/users", usersHandlers.postUser);
-app.put("/api/users/:id", usersHandlers.updateUser);
-app.delete("/api/users/:id", usersHandlers.deleteUser);
-
-const userHandlers = require("./userHandlers");
-
-const { hashPassword } = require("./auth.js");
+app.use(verifyId);
+app.put(
+  "/api/users/:id",
+  validator.validateUser,
+  hashPassword,
+  userHandlers.putUser
+);
+app.delete("/api/users/:id", userHandlers.deleteUser);
 
 app.listen(port, (err) => {
   if (err) {
@@ -41,49 +84,3 @@ app.listen(port, (err) => {
     console.log(`Server is listening on ${port}`);
   }
 });
-
-app.post("/api/users", hashPassword, usersHandlers.postUser);
-
-const isItDwight = (req, res) => {
-  if (
-    req.body.email === "dwight@theoffice.com" &&
-    req.body.password === "123456"
-  ) {
-    res.send("Credentials are valid");
-  } else {
-    res.sendStatus(401);
-  }
-};
-
-app.post("/api/login", isItDwight);
-
-const jwt = require("jsonwebtoken"); // don't forget to import
-
-const verifyPassword = (req, res) => {
-  argon2
-    .verify(req.user.hashedPassword, req.body.password)
-    .then((isVerified) => {
-      if (isVerified) {
-        const payload = { sub: req.user.id };
-
-        const token = jwt.sign(payload, process.env.JWT_SECRET, {
-          expiresIn: "1h",
-        });
-
-        delete req.user.hashedPassword;
-        res.send({ token, user: req.user });
-      } else {
-        res.sendStatus(401);
-      }
-    })
-    .catch((err) => {
-      console.error(err);
-      res.sendStatus(500);
-    });
-};
-
-app.post(
-  "/api/login",
-  userHandlers.getUserByEmailWithPasswordAndPassToNext,
-  verifyPassword
-);
