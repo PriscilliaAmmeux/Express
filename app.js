@@ -57,12 +57,21 @@ const isItDwight = (req, res) => {
 
 app.post("/api/login", isItDwight);
 
+const jwt = require("jsonwebtoken"); // don't forget to import
+
 const verifyPassword = (req, res) => {
   argon2
     .verify(req.user.hashedPassword, req.body.password)
     .then((isVerified) => {
       if (isVerified) {
-        res.send("Credentials are valid");
+        const payload = { sub: req.user.id };
+
+        const token = jwt.sign(payload, process.env.JWT_SECRET, {
+          expiresIn: "1h",
+        });
+
+        delete req.user.hashedPassword;
+        res.send({ token, user: req.user });
       } else {
         res.sendStatus(401);
       }
