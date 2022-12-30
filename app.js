@@ -30,6 +30,8 @@ app.get("/api/users/:id", usersHandlers.getUserById);
 app.put("/api/users/:id", usersHandlers.updateUser);
 app.delete("/api/users/:id", usersHandlers.deleteUser);
 
+const userHandlers = require("./userHandlers");
+
 const { hashPassword } = require("./auth.js");
 
 app.listen(port, (err) => {
@@ -41,3 +43,38 @@ app.listen(port, (err) => {
 });
 
 app.post("/api/users", hashPassword, usersHandlers.postUser);
+
+const isItDwight = (req, res) => {
+  if (
+    req.body.email === "dwight@theoffice.com" &&
+    req.body.password === "123456"
+  ) {
+    res.send("Credentials are valid");
+  } else {
+    res.sendStatus(401);
+  }
+};
+
+app.post("/api/login", isItDwight);
+
+const verifyPassword = (req, res) => {
+  argon2
+    .verify(req.user.hashedPassword, req.body.password)
+    .then((isVerified) => {
+      if (isVerified) {
+        res.send("Credentials are valid");
+      } else {
+        res.sendStatus(401);
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      res.sendStatus(500);
+    });
+};
+
+app.post(
+  "/api/login",
+  userHandlers.getUserByEmailWithPasswordAndPassToNext,
+  verifyPassword
+);
